@@ -1,0 +1,16 @@
+server:
+  global_server_ip: "0.0.0.0"
+  grpc_port: 50051
+  http_port: 8081
+database:
+  type: sqlite
+  path: "./db/cameras.db"
+
+log:
+  path: "./logs/app.log"
+  level: "info"
+
+ffmpeg:
+  stream_port_range:
+    min: 8090
+    max: 8099

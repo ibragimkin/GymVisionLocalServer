@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package gymvision;
+
+// Определяем сервис
+service LocalServer {
+  rpc StartStream (CameraInfo) returns (StreamInfo);
+  rpc StartStreamCV (CameraInfo) returns (StreamInfo);
+}
+
+
+// Определяем сообщения
+message CameraInfo {
+  string camera_id = 1;
+}
+
+message StreamInfo {
+  string stream_url = 1;
+}
