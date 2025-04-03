@@ -1,0 +1,4 @@
+/home/dev/GymVisionLocalServer/build/CMakeFiles/proto_lib.dir
+/home/dev/GymVisionLocalServer/build/CMakeFiles/GymVisionLocalServer.dir
+/home/dev/GymVisionLocalServer/build/CMakeFiles/edit_cache.dir
+/home/dev/GymVisionLocalServer/build/CMakeFiles/rebuild_cache.dir

@@ -9,8 +9,8 @@
 #include <grpcpp/alarm.h>
 #include <grpcpp/support/async_stream.h>
 #include "logger/logger.hpp"
-#include "database/db.hpp"
-#include "generated/GymVisionLocal.grpc.pb.h"
+#include "database/idatabase.hpp"
+#include "GymVisionLocal.grpc.pb.h"
 #include "server/handlers/start_stream.hpp"
 #include "server/handlers/start_stream_cv.hpp"
 class ServerImpl final {
@@ -30,16 +30,15 @@ public:
         builder.RegisterService(&service_);
         cq_ = builder.AddCompletionQueue();
         server_ = builder.BuildAndStart();
-
         std::cout << "Server started. Listening on " + address<< "\n";
-        logger_.LogInfo("Server started. Listening on " + address);
+        logger_->LogInfo("Server started. Listening on " + address);
         HandleRpcs();
     }
 
 private:
     void HandleRpcs() {
-        new StartStreamCallData(&service_, cq_.get());
-        new StartStreamCVCallData(&service_, cq_.get());
+        new StartStreamCallData(&service_, cq_.get(), database_, logger_);
+        new StartStreamCVCallData(&service_, cq_.get(), database_, logger_);
 
         void* tag;
         bool ok;

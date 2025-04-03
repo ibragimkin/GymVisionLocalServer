@@ -1,4 +1,3 @@
-#pragma once
 #include <string>
 #include <yaml-cpp/yaml.h>
 
@@ -14,7 +13,7 @@ struct AppConfig {
     static AppConfig Load(const std::string& path) {
         YAML::Node config = YAML::LoadFile(path);
         AppConfig cfg;
-
+        cfg.global_server_ip = config["server"]["global_server_ip"].as<std::string>();
         cfg.grpc_port = config["server"]["grpc_port"].as<std::string>();
         cfg.http_port = config["server"]["http_port"].as<std::string>();
 

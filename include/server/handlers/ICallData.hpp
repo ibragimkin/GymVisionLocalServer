@@ -1,4 +1,4 @@
-// Базовый класс для общих вещей (по желанию)
+#pragma once
 class ICallData {
 public:
     virtual void Proceed() = 0;

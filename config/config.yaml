@@ -1,13 +1,13 @@
 server:
   global_server_ip: "0.0.0.0"
-  grpc_port: 50051
+  grpc_port: 8082
   http_port: 8081
 database:
   type: sqlite
-  path: "./db/cameras.db"
+  path: "../db/cameras.db"
 
 log:
-  path: "./logs/app.log"
+  path: "../logs/app.log"
   level: "info"
 
 ffmpeg:
