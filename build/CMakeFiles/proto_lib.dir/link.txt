@@ -1,2 +1,0 @@
-/usr/bin/ar qc libproto_lib.a CMakeFiles/proto_lib.dir/proto/generated/GymVisionLocal.grpc.pb.cc.o CMakeFiles/proto_lib.dir/proto/generated/GymVisionLocal.pb.cc.o
-/usr/bin/ranlib libproto_lib.a
