@@ -14,8 +14,11 @@ public:
             service_->RequestStartStream(&ctx_, &request_, &responder_, cq_, cq_, this);
         } else if (status_ == PROCESS) {
             new StartStreamCallData(service_, cq_, database_, logger_); // следующий запрос
+            std::thread t(&Logger::LogInfo, logger_, "New request: StartStream for camera_id: " + std::to_string(request_.camera_id()) + ".\n");
             logger_->LogInfo("New request: StartStream for camera_id: " + std::to_string(request_.camera_id()) + ".\n");
             if (database_->CameraExists(request_.camera_id())) {
+                // TODO
+                // TODO
                 reply_.set_stream_url(""); // DOPISAT
             } else {
                 logger_->LogError("Camera with id " + std::to_string(request_.camera_id()) + " is not found.\n");

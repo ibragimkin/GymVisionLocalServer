@@ -6,12 +6,19 @@ package gymvision;
 service LocalServer {
   rpc StartStream (CameraInfo) returns (StreamInfo);
   rpc StartStreamCV (CameraInfo) returns (StreamInfo);
+  rpc RotateCamera (RotateInfo) returns (StreamInfo)
 }
 
 
 // Определяем сообщения
 message CameraInfo {
   int32 camera_id = 1;
+}
+
+message RotateInfo {
+  int32 camera_id = 1;
+  double rotate_x = 2;
+  double rotate_y = 3;
 }
 
 message StreamInfo {

@@ -10,7 +10,6 @@ int main() {
     std::cout << "DB_ON\n";
     ServerImpl grpc_server = ServerImpl(database, logger);
     std::cout << "OAOAOAO_ON\n";
-
     grpc_server.Run(app_config.global_server_ip, app_config.grpc_port);
     return 0;
 }
