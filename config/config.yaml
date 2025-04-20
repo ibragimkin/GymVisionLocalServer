@@ -1,7 +1,7 @@
 server:
   global_server_ip: "0.0.0.0"
   grpc_port: 8082
-  http_port: 8081
+  http_port: 8000
 database:
   type: sqlite
   path: "../db/cameras.db"

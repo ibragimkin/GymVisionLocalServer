@@ -1,127 +1,121 @@
 #include "database/sqlitedb.hpp"
-#include <iostream>
 
-SqliteDB::SqliteDB(const std::string &db_path)
+// sqlitedb.cpp
+SQLiteDB::SQLiteDB(const std::string &db_path)
     : db_(nullptr)
 {
-    int rc = sqlite3_open(db_path.c_str(), &db_);
-    if (rc != SQLITE_OK) {
-        std::cerr << "Cannot open database: " << sqlite3_errmsg(db_) << std::endl;
-        sqlite3_close(db_);
-        db_ = nullptr;
+    if (sqlite3_open(db_path.c_str(), &db_) != SQLITE_OK) {
+        throw std::runtime_error("Cannot open database: " + std::string(sqlite3_errmsg(db_)));
     }
-
-    // Если база открыта – создаём таблицу (если её ещё нет)
-    if (db_ && !CreateTableIfNotExists()) {
-        std::cerr << "Failed to create table in database." << std::endl;
+    if (!CreateTableIfNotExists()) {
+        sqlite3_close(db_);
+        throw std::runtime_error("Failed to create table: " + std::string(sqlite3_errmsg(db_)));
     }
 }
 
-SqliteDB::~SqliteDB() {
-    if (db_) {
-        sqlite3_close(db_);
-        db_ = nullptr;
-    }
+
+SQLiteDB::~SQLiteDB() {
+    if (db_) sqlite3_close(db_);
 }
 
-bool SqliteDB::CreateTableIfNotExists() {
-    // SQL-запрос для создания таблицы cameras с нужными полями
-    const char *sql = "CREATE TABLE IF NOT EXISTS cameras ("
-                      "id INTEGER PRIMARY KEY, "
-                      "name TEXT NOT NULL, "
-                      "ip TEXT NOT NULL, "
-                      "video_ip TEXT NOT NULL);";
-    char *errMsg = nullptr;
-    int rc = sqlite3_exec(db_, sql, nullptr, nullptr, &errMsg);
+bool SQLiteDB::CreateTableIfNotExists() {
+    static constexpr const char *sql = R"sql(
+        CREATE TABLE IF NOT EXISTS cameras (
+            id          INTEGER PRIMARY KEY,
+            name        TEXT    NOT NULL,
+            ip          TEXT    NOT NULL,
+            port        TEXT    NOT NULL,
+            user        TEXT    NOT NULL,
+            password    TEXT    NOT NULL,
+            video_url   TEXT    NOT NULL
+        );
+    )sql";
+    char *errmsg = nullptr;
+    int rc = sqlite3_exec(db_, sql, nullptr, nullptr, &errmsg);
     if (rc != SQLITE_OK) {
-        std::cerr << "Error creating table: " << errMsg << std::endl;
-        sqlite3_free(errMsg);
+        sqlite3_free(errmsg);
         return false;
     }
     return true;
 }
 
-bool SqliteDB::CameraExists(int camera_id) {
-    std::lock_guard<std::mutex> lock(db_mutex_);
-    const char *sql = "SELECT COUNT(*) FROM cameras WHERE id = ?;";
+bool SQLiteDB::CameraExists(int camera_id) {
+    static constexpr const char *sql = "SELECT 1 FROM cameras WHERE id = ? LIMIT 1;";
     sqlite3_stmt *stmt = nullptr;
-    int rc = sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr);
-    if (rc != SQLITE_OK) {
-        std::cerr << "Failed to prepare statement in CameraExists: " << sqlite3_errmsg(db_) << std::endl;
+    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) {
         return false;
     }
     sqlite3_bind_int(stmt, 1, camera_id);
-
-    bool exists = false;
-    if (sqlite3_step(stmt) == SQLITE_ROW) {
-        int count = sqlite3_column_int(stmt, 0);
-        exists = (count > 0);
-    }
+    int rc = sqlite3_step(stmt);
+    bool exists = (rc == SQLITE_ROW);
     sqlite3_finalize(stmt);
     return exists;
 }
 
-std::string SqliteDB::GetCameraIP(int camera_id) {
-    std::lock_guard<std::mutex> lock(db_mutex_);
-    const char *sql = "SELECT ip FROM cameras WHERE id = ?;";
+Camera SQLiteDB::GetCamera(int camera_id) {
+    static constexpr const char *sql =
+        "SELECT id, name, ip, port, user, password, video_url "
+        "FROM cameras WHERE id = ?;";
     sqlite3_stmt *stmt = nullptr;
-    std::string ip;
-    int rc = sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr);
-    if (rc != SQLITE_OK) {
-        std::cerr << "Failed to prepare statement in GetCameraIP: " << sqlite3_errmsg(db_) << std::endl;
-        return "";
+    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+        throw std::runtime_error("Failed to prepare GetCamera stmt");
     }
     sqlite3_bind_int(stmt, 1, camera_id);
-    if (sqlite3_step(stmt) == SQLITE_ROW) {
-        const unsigned char *text = sqlite3_column_text(stmt, 0);
-        ip = text ? reinterpret_cast<const char*>(text) : "";
+
+    int rc = sqlite3_step(stmt);
+    if (rc != SQLITE_ROW) {
+        sqlite3_finalize(stmt);
+        throw std::runtime_error("Camera not found: id=" + std::to_string(camera_id));
     }
+
+    // Читаем поля
+    int        id         = sqlite3_column_int(stmt, 0);
+    std::string name      = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
+    std::string ip        = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
+    std::string port      = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));
+    std::string user      = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 4));
+    std::string password  = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 5));
+    std::string video_url = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 6));
+
     sqlite3_finalize(stmt);
-    return ip;
+
+    // Преобразуем id в строку для Camera
+    return Camera{
+        std::to_string(id),
+        name,
+        ip,
+        port,
+        user,
+        password,
+        video_url
+    };
 }
 
-std::string SqliteDB::GetCameraVideoIP(int camera_id) {
-    std::lock_guard<std::mutex> lock(db_mutex_);
-    const char *sql = "SELECT video_ip FROM cameras WHERE id = ?;";
+void SQLiteDB::AddCamera(Camera camera) {
+    static constexpr const char *sql =
+        "INSERT INTO cameras (id, name, ip, port, user, password, video_url) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?) "
+        "ON CONFLICT(id) DO UPDATE SET "
+        "  name=excluded.name, ip=excluded.ip, port=excluded.port, "
+        "  user=excluded.user, password=excluded.password, video_url=excluded.video_url;";
     sqlite3_stmt *stmt = nullptr;
-    std::string video_ip;
-    int rc = sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr);
-    if (rc != SQLITE_OK) {
-        std::cerr << "Failed to prepare statement in GetCameraVideoIP: " << sqlite3_errmsg(db_) << std::endl;
-        return "";
+    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+        throw std::runtime_error("Failed to prepare AddCamera stmt");
     }
-    sqlite3_bind_int(stmt, 1, camera_id);
-    if (sqlite3_step(stmt) == SQLITE_ROW) {
-        const unsigned char *text = sqlite3_column_text(stmt, 0);
-        video_ip = text ? reinterpret_cast<const char*>(text) : "";
-    }
+
+    // Привязываем параметры
+    int id_int = std::stoi(camera.id);
+    sqlite3_bind_int(stmt,    1, id_int);
+    sqlite3_bind_text(stmt,   2, camera.name.c_str(),     -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt,   3, camera.ip.c_str(),       -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt,   4, camera.port.c_str(),     -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt,   5, camera.user.c_str(),     -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt,   6, camera.password.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt,   7, camera.video_url.c_str(),-1, SQLITE_TRANSIENT);
+
+    int rc = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
-    return video_ip;
-}
-
-void SqliteDB::AddCamera(int camera_id, std::string name, std::string ip, std::string video_ip) {
-    std::lock_guard<std::mutex> lock(db_mutex_);
-
-    if (CameraExists(camera_id)) {
-        std::cerr << "Camera with id " << camera_id << " already exists." << std::endl;
-        return;
-    }
-
-    const char *sql = "INSERT INTO cameras (id, name, ip, video_ip) VALUES (?, ?, ?, ?);";
-    sqlite3_stmt *stmt = nullptr;
-    int rc = sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr);
-    if (rc != SQLITE_OK) {
-        std::cerr << "Failed to prepare statement in AddCamera: " << sqlite3_errmsg(db_) << std::endl;
-        return;
-    }
-    sqlite3_bind_int(stmt, 1, camera_id);
-    sqlite3_bind_text(stmt, 2, name.c_str(), -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 3, ip.c_str(), -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 4, video_ip.c_str(), -1, SQLITE_STATIC);
-
-    rc = sqlite3_step(stmt);
     if (rc != SQLITE_DONE) {
-        std::cerr << "Error inserting camera: " << sqlite3_errmsg(db_) << std::endl;
+        throw std::runtime_error("Failed to execute AddCamera stmt");
     }
-    sqlite3_finalize(stmt);
 }
