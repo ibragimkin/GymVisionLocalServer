@@ -25,5 +25,5 @@ Subcommands:
   
   check-camera  [id]             Check if a camera exists
   
-  move-camera   [id]              Move camera PTZ by x and y for time
+  move-camera   [id] [x] [y] [time]             Move camera PTZ by x and y for time
   
