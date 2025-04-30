@@ -4,10 +4,13 @@ cd GymVisionLocalServer
 
 # Создаём build-директорию и собираем проект
 mkdir build && cd build
+
 cmake .. && make
 
 # Запускаем сервер
 ./GymVisionLocalServer
+
+cd ../py && uvicorn bridge:app --host 0.0.0.0 --port 8000
 
 # Использование интерфейса коммандной строки:
 ./camera_cli [subbcomand]
